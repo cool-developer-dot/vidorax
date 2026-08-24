@@ -1,20 +1,35 @@
 import { useEffect, useState } from 'react';
 import { useColorScheme as useRNColorScheme } from 'react-native';
 
+import { selectThemeMode, useThemeStore } from '@/store/theme';
+
+type ResolvedColorScheme = 'light' | 'dark';
+
 /**
- * To support static rendering, this value needs to be re-calculated on the client side for web
+ * Web color scheme — waits for client hydration, then resolves themeStore
+ * preference (light / dark / system) against the browser scheme.
  */
-export function useColorScheme() {
+export function useColorScheme(): ResolvedColorScheme {
   const [hasHydrated, setHasHydrated] = useState(false);
+  const systemScheme = useRNColorScheme();
+  const themeMode = useThemeStore(selectThemeMode);
 
   useEffect(() => {
+    // Client-only hydration gate for SSR-safe initial paint.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional post-hydrate flip
     setHasHydrated(true);
   }, []);
 
-  const colorScheme = useRNColorScheme();
+  if (!hasHydrated) {
+    return 'light';
+  }
 
-  if (hasHydrated) {
-    return colorScheme;
+  if (themeMode === 'light' || themeMode === 'dark') {
+    return themeMode;
+  }
+
+  if (systemScheme === 'dark') {
+    return 'dark';
   }
 
   return 'light';

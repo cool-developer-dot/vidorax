@@ -8,10 +8,11 @@ dist/
 build/
 *.tsbuildinfo
 
-# Environment files
+# Environment files / secrets
 .env
 .env.*
 !.env.example
+!**/.env.example
 
 # Logs
 logs/
@@ -44,6 +45,7 @@ web-build/
 *.p8
 *.p12
 *.key
+*.pem
 *.mobileprovision
 *.orig.*
 *.hprof
@@ -58,7 +60,7 @@ mobile/ios/
 *.aab
 *.ipa
 
-# Android Studio / Gradle
+# Android Studio / Gradle / signing
 .gradle/
 local.properties
 *.iml
@@ -66,17 +68,15 @@ local.properties
 *.hprof
 .cxx/
 *.keystore
-!debug.keystore
+*.jks
 
-# macOS
+# macOS / editor
 .DS_Store
 .AppleDouble
 .LSOverride
 ._*
 .Spotlight-V100
 .Trashes
-
-# VS Code
 .vscode/*
 !.vscode/extensions.json
 !.vscode/settings.json
@@ -86,10 +86,12 @@ local.properties
 # JetBrains
 .idea/
 
-# Prisma
-backend/prisma/migrations/**/migration_lock.toml
+# Local QA / emulator capture artifacts (not source)
+mobile/*.png
+mobile/crash.txt
+mobile/phase2-remaining/
 
-# Misc
+# Misc / caches
 *.swp
 *.swo
 *~
@@ -97,3 +99,5 @@ backend/prisma/migrations/**/migration_lock.toml
 .turbo/
 tmp/
 temp/
+.tmp/
+coverage/

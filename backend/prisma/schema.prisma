@@ -1,0 +1,272 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum DownloadStatus {
+  QUEUED
+  DOWNLOADING
+  PAUSED
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+/// Internal operational lifecycle — distinct from customer-facing DownloadStatus.
+enum DownloadWorkerState {
+  IDLE
+  WAITING
+  STARTING
+  TRANSFERRING
+  PAUSING
+  PAUSED
+  RETRY_WAIT
+  VERIFYING
+  COMPLETING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum FavoritePlatform {
+  YOUTUBE
+  FACEBOOK
+  INSTAGRAM
+  TIKTOK
+  X
+  VIMEO
+  DAILYMOTION
+  OTHER
+}
+
+enum SupportStatus {
+  OPEN
+  IN_PROGRESS
+  CLOSED
+}
+
+enum ThemeMode {
+  SYSTEM
+  LIGHT
+  DARK
+}
+
+// ─── Models ──────────────────────────────────────────────────────────────────
+
+model User {
+  id            String   @id @default(uuid()) @db.Uuid
+  name          String
+  email         String   @unique
+  passwordHash  String
+  role          Role     @default(USER)
+  avatarUrl     String?
+  emailVerified Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  downloads         DownloadHistory[]
+  favorites         Favorite[]
+  mediaFolders      MediaFolder[]
+  supportTickets    SupportTicket[]
+  settings          UserSettings?
+  browserHistory    BrowserHistory[]
+  bookmarks         Bookmark[]
+  playbackHistory   PlaybackHistory[]
+
+  @@index([role])
+  @@index([createdAt])
+}
+
+model DownloadHistory {
+  id           String         @id @default(uuid()) @db.Uuid
+  userId       String         @db.Uuid
+  title        String
+  sourceUrl    String
+  platform     String
+  thumbnailUrl String
+  fileName     String
+  /// Total media size in bytes when known; 0 means unknown/unset.
+  fileSize     BigInt
+  status       DownloadStatus @default(QUEUED)
+  progress     Int            @default(0)
+  /// Canonical selected quality label (e.g. 720p). Null for pre-Week-7 rows.
+  quality      String?
+  /// Selected resolution as WIDTHxHEIGHT when known. Null if unknown.
+  resolution   String?
+  /// Selected bitrate in bits/sec when known. Null if unknown — never 0-as-unknown.
+  bitrate      Int?
+  /// Transfer retry attempts for this download lifecycle (not create attempt).
+  retryCount   Int            @default(0)
+  /// Durable operational worker milestone. Null for unresolved historical DOWNLOADING rows.
+  workerState  DownloadWorkerState?
+  /// Stable engine-style failure code (e.g. NETWORK_TIMEOUT). Cleared on retry/complete.
+  errorCode    String?
+  errorMessage String?
+  /// Set once on first transition to COMPLETED (completion timestamp).
+  downloadedAt DateTime?
+  /// Logical organization for this completed media record.
+  /// `NULL` represents the virtual "Downloads / Unfiled" bucket.
+  folderId     String?        @db.Uuid
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  folder MediaFolder? @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  /// Playback progress rows keyed by this download/media identity.
+  /// Deleted with the media record (ON DELETE CASCADE) — no orphan history.
+  playbackHistory PlaybackHistory[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([platform])
+  @@index([userId, status])
+  @@index([userId, status, createdAt])
+  @@index([userId, platform, createdAt])
+  @@index([userId, downloadedAt])
+  @@index([userId, createdAt])
+  @@index([folderId])
+  @@index([userId, status, folderId])
+}
+
+/// Durable per-user watch position / completion for a completed media item.
+/// Identity is always (userId, mediaId) where mediaId === DownloadHistory.id.
+/// Continue Watching / Recently Watched / History are derived queries — not tables.
+model PlaybackHistory {
+  id              String    @id @default(uuid()) @db.Uuid
+  userId          String    @db.Uuid
+  /// Stable completed-download / Library media identity (never filename/URI).
+  mediaId         String    @db.Uuid
+  positionSeconds Float
+  durationSeconds Float
+  /// Derived server-side from position/duration; never trust client percent.
+  progressPercent Float
+  /// Set only when actual playback starts (not on library tap / player mount).
+  lastPlayedAt    DateTime?
+  completed       Boolean   @default(false)
+  /// Monotonic client revision for stale-write / out-of-order protection.
+  clientRevision  Int       @default(0)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  user  User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  media DownloadHistory @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, mediaId])
+  @@index([userId, lastPlayedAt])
+  @@index([userId, completed])
+}
+
+model Favorite {
+  id           String           @id @default(uuid()) @db.Uuid
+  userId       String           @db.Uuid
+  title        String
+  platform     FavoritePlatform
+  sourceUrl    String
+  thumbnailUrl String
+  createdAt    DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, sourceUrl])
+  @@index([userId])
+  @@index([createdAt])
+  @@index([userId, createdAt])
+  @@index([userId, platform, createdAt])
+}
+
+model MediaFolder {
+  id             String   @id @default(uuid()) @db.Uuid
+  userId         String   @db.Uuid
+  /// Display name as entered by the user.
+  name           String
+  /// Canonical normalized form used for case-insensitive duplicate detection.
+  normalizedName String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  downloads DownloadHistory[]
+
+  @@unique([userId, normalizedName])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model SupportTicket {
+  id        String        @id @default(uuid()) @db.Uuid
+  userId    String        @db.Uuid
+  subject   String
+  message   String
+  status    SupportStatus @default(OPEN)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+  @@index([userId, status])
+  @@index([createdAt])
+}
+
+model UserSettings {
+  id                    String    @id @default(uuid()) @db.Uuid
+  userId                String    @unique @db.Uuid
+  theme                 ThemeMode @default(SYSTEM)
+  language              String    @default("en")
+  notificationsEnabled  Boolean   @default(true)
+  wifiOnlyDownloads     Boolean   @default(true)
+  autoResumeDownloads   Boolean   @default(true)
+  downloadDirectory     String    @default("downloads")
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model BrowserHistory {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  url       String
+  title     String
+  hostname  String
+  visitedAt DateTime @default(now())
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([createdAt])
+  @@index([visitedAt])
+  @@index([hostname])
+  @@index([userId, visitedAt])
+}
+
+model Bookmark {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String   @db.Uuid
+  url        String
+  title      String
+  hostname   String
+  faviconUrl String?
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, url])
+  @@index([userId])
+  @@index([hostname])
+  @@index([userId, createdAt])
+}

@@ -58,7 +58,17 @@ mobile/
 
 ## Environment
 
-Environment-specific configuration will be added as the project evolves. Use Expo's built-in support for `app.config.ts` and environment variables when needed.
+Copy `.env.example` to `.env` and adjust as needed:
+
+```bash
+cp .env.example .env
+```
+
+| Variable | Description | Default |
+| -------- | ----------- | ------- |
+| `EXPO_PUBLIC_API_BASE_URL` | VidoraX backend origin | `http://localhost:3105` |
+
+The Axios client appends `/api` automatically. On Android Emulator, `localhost` is rewritten to `10.0.2.2` in `src/constants/environment.ts` so requests reach the host machine (e.g. `http://10.0.2.2:3105/api`). iOS Simulator keeps `localhost`. Physical devices should set a LAN IP.
 
 ## Related
 

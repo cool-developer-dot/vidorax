@@ -1,0 +1,9 @@
+export { prisma } from '../database/index.js';
+export * as authRepository from './auth.repository.js';
+export * as userRepository from './user.repository.js';
+export * as settingsRepository from './settings.repository.js';
+export * as browserHistoryRepository from './browser-history.repository.js';
+export * as bookmarkRepository from './bookmark.repository.js';
+export * as downloadRepository from './download.repository.js';
+export * as favoriteRepository from './favorite.repository.js';
+export * as playbackRepository from './playback.repository.js';
