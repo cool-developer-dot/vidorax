@@ -6,9 +6,9 @@
   "type": "module",
   "main": "dist/server.js",
   "scripts": {
-    "dev": "node init && tsx watch src/server.ts",
-    "build": "node init && prisma generate && tsc",
-    "start": "node init && node dist/server.js",
+    "dev": "tsx watch src/server.ts",
+    "build": "prisma generate && tsc",
+    "start": "node dist/server.js",
     "typecheck": "tsc --noEmit",
     "verify:avatar": "node scripts/verify-avatar-endpoints.mjs",
     "verify:analyze": "MEDIA_ANALYSIS_ALLOW_LOOPBACK=1 tsx scripts/verify-media-analysis.ts",

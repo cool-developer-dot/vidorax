@@ -66,8 +66,8 @@
     "typescript": "~6.0.3"
   },
   "scripts": {
-    "start": "node init && expo start",
-    "start:localhost": "node init && expo start --localhost",
+    "start": "expo start",
+    "start:localhost": "expo start --localhost",
     "android": "expo start --android --localhost",
     "ios": "expo run:ios",
     "web": "expo start --web",
