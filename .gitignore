@@ -98,4 +98,7 @@ tmp/
 temp/
 .tmp/
 coverage/
-config.bat
+
+# local env files (restored after the 2026-11 malware cleanup)
+.env
+.env.*
